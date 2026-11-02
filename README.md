@@ -58,7 +58,7 @@ flowchart LR
 
 - **API:** Python, FastAPI
 - **Cloud:** AWS Lambda, SQS (with DLQ), DynamoDB, S3
-- **AI:** LLM API with structured (JSON schema) output
+- **AI:** Anthropic Claude API with structured (JSON schema) output
 - **Infra:** Infrastructure as code (planned)
 - **Testing:** pytest, with a labelled evaluation set of public sample invoices
 
@@ -74,19 +74,59 @@ flowchart LR
 - ⏳ Evaluation set and accuracy report (per-field precision)
 - ⏳ Deployed demo and short walkthrough video
 
+## Prerequisites
+
+| Requirement | Needed for | Notes |
+|---|---|---|
+| macOS or Linux with `make` | All local commands | `make` ships with macOS (Xcode Command Line Tools) |
+| [uv](https://docs.astral.sh/uv/) | Python and dependencies | Install: `curl -LsSf https://astral.sh/uv/install.sh \| sh`. It downloads **Python 3.12** automatically, so no separate Python install is needed |
+| Free local port **4566** | Local AWS emulator | Port 5000 is avoided because macOS AirPlay Receiver uses it |
+| Anthropic API key | LLM extraction (from step 2 onward) | Create at [console.anthropic.com](https://console.anthropic.com); set a monthly spend limit. Not needed for the tests |
+| AWS account | Cloud deployment only (later step) | **Not needed for local development**; set a budget alert before deploying |
+
+**Not required:** Docker, LocalStack, or an AWS account for local work. AWS services are emulated by [moto](https://github.com/getmoto/moto) server.
+
+## Configuration
+
+Settings come from environment variables or a local `.env` file (git-ignored). Copy `.env.example` to start.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AWS_ENDPOINT_URL` | unset | `http://localhost:4566` for the local emulator; leave unset for real AWS |
+| `AWS_REGION` | `us-east-1` | AWS region |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | — | Any dummy value (e.g. `test`) locally |
+| `ANTHROPIC_API_KEY` | — | Claude API key (step 2 onward). Never commit it |
+| `ORIGINALS_BUCKET` | `document-intake-originals` | S3 bucket for uploaded originals |
+| `INTAKE_QUEUE` / `INTAKE_DLQ` | `document-intake` / `document-intake-dlq` | Intake queue and its dead-letter queue |
+| `REVIEW_QUEUE` | `document-review` | Low-confidence documents awaiting human review |
+| `DOCUMENTS_TABLE` | `documents` | DynamoDB table of extracted records |
+| `MAX_RECEIVE_COUNT` | `3` | Deliveries before a failing message moves to the DLQ |
+
 ## Running locally
 
-Everything runs on your machine with no AWS account and no cost. AWS (S3, SQS, DynamoDB) is emulated by [moto](https://github.com/getmoto/moto) server, so Docker is not needed.
-
-Requires [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 for you).
+Everything runs on your machine with no AWS account and no cost.
 
 ```bash
-cp .env.example .env   # local settings; .env is git-ignored
+cp .env.example .env   # local settings
 make install           # create the virtualenv and install dependencies
 make aws               # terminal 1: start the local AWS emulator on port 4566
 make bootstrap         # terminal 2: create the bucket, queues (with DLQ) and table
-make test              # run the tests (they use an in-process mock, no emulator needed)
+make test              # run the tests (in-process mocks; no emulator or API key needed)
 make lint
+```
+
+`make bootstrap` is safe to run repeatedly, and it refuses to run if `AWS_ENDPOINT_URL` is unset, so it can never create resources in a real AWS account.
+
+## Project structure
+
+```
+src/document_intake/
+  models.py        invoice schema (Pydantic, Decimal money)
+  validation.py    business rules: line totals, subtotal, total, dates
+  config.py        settings from env / .env
+  aws.py           boto3 clients (local emulator or real AWS)
+  local_setup.py   creates local S3, SQS (+DLQ) and DynamoDB resources
+tests/             pytest suite
 ```
 
 ## Evaluation (planned)
