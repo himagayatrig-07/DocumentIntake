@@ -64,7 +64,8 @@ flowchart LR
 
 ## Build plan
 
-- ⏳ Repo setup, README, architecture
+- ✅ Repo setup, README, architecture, invoice schema and business-rule validation
+- ✅ Local development environment (emulated S3, SQS with DLQ, DynamoDB)
 - ⏳ Upload API and S3 storage
 - ⏳ SQS intake queue and extractor Lambda
 - ⏳ LLM extraction with schema validation
@@ -72,6 +73,21 @@ flowchart LR
 - ⏳ Idempotency keys, retries and dead-letter queue
 - ⏳ Evaluation set and accuracy report (per-field precision)
 - ⏳ Deployed demo and short walkthrough video
+
+## Running locally
+
+Everything runs on your machine with no AWS account and no cost. AWS (S3, SQS, DynamoDB) is emulated by [moto](https://github.com/getmoto/moto) server, so Docker is not needed.
+
+Requires [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 for you).
+
+```bash
+cp .env.example .env   # local settings; .env is git-ignored
+make install           # create the virtualenv and install dependencies
+make aws               # terminal 1: start the local AWS emulator on port 4566
+make bootstrap         # terminal 2: create the bucket, queues (with DLQ) and table
+make test              # run the tests (they use an in-process mock, no emulator needed)
+make lint
+```
 
 ## Evaluation (planned)
 
